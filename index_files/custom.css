@@ -1,0 +1,11 @@
+@media only screen and (max-width: 959px) {
+  default-breakpoint #site-logo.has-responsive-logo .custom-logo-link {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  #site-logo #site-logo-inner a img, #site-header.center-header #site-navigation-wrap .middle-site-logo a img {
+      max-width: 130px;
+  }
+}

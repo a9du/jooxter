@@ -1,0 +1,259 @@
+
+var visibleeTrackingObj;
+var visibleeTracking;
+
+if(typeof(visibleeTrackingObj) == 'undefined')
+{
+	visibleeTrackingObj = (function(){
+		var instance = null;
+
+		function _ins()
+		{
+			var _self = this;
+			this.trackURL = '//www.link-page.info/tracking_19544/';
+			this.eventCount = 0;
+			this.secure = (location.protocol === 'https:');
+			this.isSafari = Object.prototype.toString.call(window.HTMLElement).indexOf('Constructor') > 0;
+			this.isFirefox = typeof InstallTrigger !== 'undefined';   // Firefox 1.0+
+			this.pingEnabled = this.isSafari || this.isFirefox;
+			this.pingInterval = 30000; // 30s
+			this.referrer = document.referrer;
+			if(this.referrer == null) this.referrer = "";
+			if(this.referrer.length>255) this.referrer = this.referrer.substring(0,255);
+			this.referrer = '"'+this.referrer+'"';
+			this.visitTimeout = 1800*1000;
+			this.lastRequestTime = 0;
+			this.lastEvent;
+			this.lastXPath;
+            this.engagedProspectInfo;
+
+            this.getEngagedProspectInfo = function (callback) {
+                var src = _self.trackURL + 'engaged_prospect_contact.js'+this.getTrackParams();
+                var s = document.createElement('script');
+                s.type = 'text/javascript';
+                s.async = false;
+                s.src = src;
+                s.referrerPolicy = "no-referrer-when-downgrade";
+                s.addEventListener('load', callback);
+                (document.getElementsByTagName('body')[0] || document.getElementsByTagName('head')[0]).appendChild(s);
+            }
+
+            this.setCookie = function(cname, cvalue, exdays) {
+              var d = new Date();
+              d.setTime(d.getTime() + (exdays * 1000));
+              var expires = "expires="+d.toUTCString();
+              document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+            }
+
+            this.getCookie = function(cname) {
+              var name = cname + "=";
+              var ca = document.cookie.split(';');
+              for(var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) == ' ') {
+                  c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                  return c.substring(name.length, c.length);
+                }
+              }
+              return "";
+            }
+
+            this.getTrackParams = function() {
+                var queryString = "";
+                var cookie = this.getCookie("visiblee_e");
+                if (cookie != "") {
+                    queryString += (queryString == ""?"?":"&");
+                    queryString += "visiblee_e="+cookie;
+                }
+                cookie = this.getCookie("visiblee_c");
+                if (cookie != "") {
+                    queryString += (queryString == ""?"?":"&");
+                    queryString += "visiblee_c="+cookie;
+                }
+                return queryString;
+            }
+
+            this.campaignMap = function() {
+				var params = visibleeTracking.getUrlParams();
+				if (params["visiblee_c"]) {
+					this.setCookie("visiblee_c", params["visiblee_c"], "1800");
+				}
+				if (params["visiblee_e"]) {
+					this.setCookie("visiblee_e", params["visiblee_e"], "31536000");
+				}
+            }
+
+            this.getUrlParams = function() {
+				var queryString = window.location.search.slice(1);
+				var obj = {};
+				if (!queryString) {
+					return obj;
+				}
+				queryString = queryString.split('#')[0];
+				var arr = queryString.split('&');
+				for (var i = 0; i < arr.length; i++) {
+					var a = arr[i].split('=');
+					var paramName = a[0];
+					var paramValue = typeof (a[1]) === 'undefined' ? true : a[1];
+					if (!obj[paramName]) {
+						obj[paramName] = paramValue;
+					} else if (obj[paramName] && typeof obj[paramName] === 'string'){
+						obj[paramName] = [obj[paramName]];
+						obj[paramName].push(paramValue);
+					} else {
+						obj[paramName].push(paramValue);
+					}
+				}
+
+				return obj;
+            }
+
+			this.getPathTo = function (element) {
+				if(element.nodeName == '#document'){
+					var w = element.parentWindow || element.defaultView
+					if(w != null) {
+						var iframe = w.frameElement;
+						if(iframe != null) return _self.getPathTo(iframe)+'/';
+					}
+					return '';
+				}
+
+
+				if (element.id !== ''){
+					return _self.getPathTo(element.ownerDocument)+'id("' + element.id + '")';
+				}
+
+				if (element === document.body)
+					return element.tagName;
+
+				var ix = 0;
+				if(element.parentNode != null)
+				{
+					var siblings = element.parentNode.childNodes;
+					for (var i = 0; i < siblings.length; i++) {
+						var sibling = siblings[i];
+						if (sibling === element)
+							return _self.getPathTo(element.parentNode) + '/' + element.tagName + '[' + (ix + 1) + ']';
+						if (sibling.nodeType === 1 && sibling.tagName === element.tagName)
+							ix++;
+					}
+				}
+				else return element.tagName;
+			};
+
+			this.getAnchor = function () {
+				var anchor = window.location.hash;
+				if(anchor == null || anchor == "") anchor = "#";
+				if(anchor.length>255) anchor = anchor.substring(0,255);
+				return anchor;
+			};
+
+			this.trackEvent = function (e) {
+				if (e === undefined)
+					e = window.event;                     // IE hack
+
+				if(!e || !e.isTrusted) return;
+				var event = e.type;
+
+				var target = 'target' in e ? e.target : e.srcElement; // another IE hack
+				var xpath = target ? _self.getPathTo(target) : 'BODY';
+				if(!xpath || xpath === '') xpath = 'BODY';
+
+				_self.track(event, xpath);
+			};
+
+			this.track = function (event, xpath) {
+				var now = Math.floor(new Date().getTime()/1000);
+				if(_self.lastRequestTime === now && _self.lastEvent === event && (event === 'wheel' || _self.lastXPath === xpath)) return;
+				if(event != 'ping') {
+					_self.lastRequestTime = now;
+					_self.lastEvent = event;
+					_self.lastXPath = xpath;
+				} else {
+					if(_self.lastRequestTime + _self.visitTimeout < now) return;
+				}
+				_self.eventCount++;
+
+				var src = _self.trackURL + now + '/' + encodeURIComponent(event) + '/' + encodeURIComponent(xpath) + '/' + encodeURIComponent(_self.referrer) + '/' + encodeURIComponent(_self.getAnchor()) + '/event_' + _self.eventCount + '.js' + this.getTrackParams();
+				var s = document.createElement('script');
+				s.type = 'text/javascript';
+                s.referrerPolicy = "no-referrer-when-downgrade";
+                s.async = false;
+				s.src = src;
+				(document.getElementsByTagName('body')[0] || document.getElementsByTagName('head')[0]).appendChild(s);
+			};
+
+			this.bindEventsPartial = function (w){
+				var isFrame = w.frameElement != null;
+								
+				if(w.addEventListener) {
+					w.addEventListener('click', _self.trackEvent, false);
+					
+					document.addEventListener("wheel", _self.trackEvent, { passive: true });	 
+					
+					if(!isFrame) {
+						// w.addEventListener('load', _self.trackEvent, false);
+						w.addEventListener('beforeunload', _self.trackEvent, false);
+						w.addEventListener("pageshow", _self.trackEvent, false);
+						w.addEventListener("pagehide", _self.trackEvent, false);
+					}
+				} else {
+					w.document.attachEvent('onclick', _self.trackEvent);
+					
+					document.attachEvent("onwheel", _self.trackEvent);
+					
+					if(!isFrame) {
+						// w.attachEvent('onload', _self.trackEvent);
+						w.attachEvent('onbeforeunload', _self.trackEvent);
+						w.attachEvent("onpageshow", _self.trackEvent);
+						w.attachEvent("onpagehide", _self.trackEvent);
+					}
+				}
+				if(_self.pingEnabled && !isFrame) setInterval(_self.track,_self.pingInterval,'ping','BODY');
+
+				/*
+				var iframes = w.document.getElementsByTagName('iframe');
+				var i;
+				for(i = 0; i < iframes.length; i++) {
+					if(!(_self.secure && iframes[i].src.indexOf('https:') != 0) && !(!_self.secure && iframes[i].src.indexOf('https:') == 0)){
+						_self.bindEventsPartial(iframes[i].contentWindow);
+					}
+				}
+				*/
+			};
+
+			this.bindEvents = function (){
+				_self.track('load', 'BODY');
+				_self.bindEventsPartial(window);
+			};
+		}
+
+		return new function ()
+		{
+			this.getInstance = function ()
+			{
+				if(instance == null)
+				{
+					instance = new _ins();
+					instance.constructor = null;
+				}
+				return instance;
+			}
+		}
+	})();
+}
+
+if(typeof(visibleeTracking) == 'undefined')
+{
+	visibleeTracking = visibleeTrackingObj.getInstance();
+    visibleeTracking.campaignMap();
+	visibleeTracking.bindEvents();
+	
+}
+
+
+/*****************************************************************/
+
+var loeaded=true;
